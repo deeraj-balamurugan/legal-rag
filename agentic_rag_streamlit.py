@@ -5,6 +5,9 @@ from fpdf import FPDF
 from dotenv import load_dotenv
 import streamlit as st
 
+# MUST be the first Streamlit call
+st.set_page_config(page_title="Agentic RAG Chatbot", page_icon="🦜")
+
 # OCR
 from PIL import Image
 import pytesseract
@@ -93,11 +96,11 @@ def retrieve(query: str):
     content = "\n\n".join(content_blocks)
     refs = "\n".join(references)
 
-    markdown_output = f"""### \U0001F4D8 Retrieved Information\n\n{content}
+    markdown_output = f"""### 📘 Retrieved Information\n\n{content}
 
 ---
 
-### \U0001F4CE References
+### 📎 References
 {refs}
 """
     return markdown_output, retrieved_docs
@@ -119,7 +122,6 @@ agent = create_tool_calling_agent(llm=llm, tools=tools, prompt=prompt)
 agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
 
 # --- Streamlit UI ---
-st.set_page_config(page_title="Agentic RAG Chatbot", page_icon="🦜")
 st.title("🦜 Legal Agentic RAG Chatbot")
 
 if "messages" not in st.session_state:
@@ -127,11 +129,11 @@ if "messages" not in st.session_state:
 if "chat_sessions" not in st.session_state:
     st.session_state.chat_sessions = {}
 
-chat_title = st.text_input("\U0001F4C1 Name this Chat", value="Untitled Chat")
+chat_title = st.text_input("📁 Name this Chat", value="Untitled Chat")
 
 # --- Sidebar History ---
 with st.sidebar:
-    st.markdown("## \U0001F5C2 Chat History")
+    st.markdown("## 🗂 Chat History")
     for title, logs in st.session_state.chat_sessions.items():
         with st.expander(title):
             for i, msg in enumerate(logs):
@@ -152,7 +154,7 @@ if user_question:
         st.markdown(user_question)
     st.session_state.messages.append(HumanMessage(user_question))
 
-    with st.spinner("\U0001F50D Searching..."):
+    with st.spinner("🔍 Searching..."):
         result = agent_executor.invoke({
             "input": user_question,
             "chat_history": st.session_state.messages,
@@ -167,12 +169,12 @@ if user_question:
 
         pdf_bytes = create_pdf(ai_message)
         b64_pdf = base64.b64encode(pdf_bytes).decode()
-        pdf_link = f'<a href="data:application/pdf;base64,{b64_pdf}" download="chat_response.pdf">\U0001F4C4 Download as PDF</a>'
+        pdf_link = f'<a href="data:application/pdf;base64,{b64_pdf}" download="chat_response.pdf">📄 Download as PDF</a>'
         st.markdown(pdf_link, unsafe_allow_html=True)
 
         wa_text = urllib.parse.quote(f"Legal AI Bot Response:\n\n{ai_message}")
         wa_link = f"https://wa.me/?text={wa_text}"
-        st.markdown(f"[\U0001F4AC Share via WhatsApp]({wa_link})", unsafe_allow_html=True)
+        st.markdown(f"[💬 Share via WhatsApp]({wa_link})", unsafe_allow_html=True)
 
     st.session_state.messages.append(AIMessage(ai_message))
 
