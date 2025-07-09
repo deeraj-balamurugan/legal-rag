@@ -5,6 +5,10 @@ from fpdf import FPDF
 from dotenv import load_dotenv
 import streamlit as st
 
+# OCR
+from PIL import Image
+import pytesseract
+
 # LangChain Core
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -39,8 +43,25 @@ def create_pdf(text: str) -> bytes:
     pdf.add_page()
     pdf.set_font("Arial", size=12)
     for line in text.split("\n"):
-        pdf.multi_cell(0, 10, txt=line)
-    return bytes(pdf.output(dest="S").encode("latin1"))
+        try:
+            pdf.multi_cell(0, 10, txt=line)
+        except Exception:
+            pdf.multi_cell(0, 10, txt="[Encoding Error: Skipped line]")
+    return bytes(pdf.output(dest="S"))
+
+# --- OCR from uploaded image ---
+def extract_text_from_image(image_file):
+    image = Image.open(image_file)
+    return pytesseract.image_to_string(image)
+
+# --- Upload and Ingest Document ---
+st.sidebar.markdown("## 📤 Upload Document")
+uploaded_image = st.sidebar.file_uploader("Upload scanned contract/image", type=["jpg", "jpeg", "png"])
+
+if uploaded_image:
+    extracted_text = extract_text_from_image(uploaded_image)
+    vector_store.add_texts([extracted_text], metadatas=[{"source": uploaded_image.name}])
+    st.sidebar.success("✅ Document processed and indexed!")
 
 # --- Custom Retrieval Tool with References ---
 @tool(response_format="content_and_artifact")
@@ -72,11 +93,11 @@ def retrieve(query: str):
     content = "\n\n".join(content_blocks)
     refs = "\n".join(references)
 
-    markdown_output = f"""### 📘 Retrieved Information\n\n{content}
+    markdown_output = f"""### \U0001F4D8 Retrieved Information\n\n{content}
 
 ---
 
-### 📎 References
+### \U0001F4CE References
 {refs}
 """
     return markdown_output, retrieved_docs
@@ -101,24 +122,23 @@ agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
 st.set_page_config(page_title="Agentic RAG Chatbot", page_icon="🦜")
 st.title("🦜 Legal Agentic RAG Chatbot")
 
-# --- Named Chat Setup ---
 if "messages" not in st.session_state:
     st.session_state.messages = []
 if "chat_sessions" not in st.session_state:
     st.session_state.chat_sessions = {}
 
-chat_title = st.text_input("📁 Name this Chat", value="Untitled Chat")
+chat_title = st.text_input("\U0001F4C1 Name this Chat", value="Untitled Chat")
 
-# --- Display Sidebar History ---
+# --- Sidebar History ---
 with st.sidebar:
-    st.markdown("## 🗂 Chat History")
+    st.markdown("## \U0001F5C2 Chat History")
     for title, logs in st.session_state.chat_sessions.items():
         with st.expander(title):
             for i, msg in enumerate(logs):
                 st.markdown(f"**Q{i+1}:** {msg['user']}")
                 st.markdown(f"**A{i+1}:** {msg['bot']}")
 
-# --- Show Past Messages ---
+# --- Show Chat History ---
 for message in st.session_state.messages:
     role = "user" if isinstance(message, HumanMessage) else "assistant"
     with st.chat_message(role):
@@ -132,7 +152,7 @@ if user_question:
         st.markdown(user_question)
     st.session_state.messages.append(HumanMessage(user_question))
 
-    with st.spinner("🔍 Searching..."):
+    with st.spinner("\U0001F50D Searching..."):
         result = agent_executor.invoke({
             "input": user_question,
             "chat_history": st.session_state.messages,
@@ -145,20 +165,17 @@ if user_question:
     with st.chat_message("assistant"):
         st.markdown(ai_message, unsafe_allow_html=False)
 
-        # ✅ PDF Download Button
         pdf_bytes = create_pdf(ai_message)
         b64_pdf = base64.b64encode(pdf_bytes).decode()
-        pdf_link = f'<a href="data:application/pdf;base64,{b64_pdf}" download="chat_response.pdf">📄 Download as PDF</a>'
+        pdf_link = f'<a href="data:application/pdf;base64,{b64_pdf}" download="chat_response.pdf">\U0001F4C4 Download as PDF</a>'
         st.markdown(pdf_link, unsafe_allow_html=True)
 
-        # ✅ WhatsApp Share Button
         wa_text = urllib.parse.quote(f"Legal AI Bot Response:\n\n{ai_message}")
         wa_link = f"https://wa.me/?text={wa_text}"
-        st.markdown(f"[💬 Share via WhatsApp]({wa_link})", unsafe_allow_html=True)
+        st.markdown(f"[\U0001F4AC Share via WhatsApp]({wa_link})", unsafe_allow_html=True)
 
     st.session_state.messages.append(AIMessage(ai_message))
 
-    # ✅ Store to Named Chat Session
     if chat_title not in st.session_state.chat_sessions:
         st.session_state.chat_sessions[chat_title] = []
     st.session_state.chat_sessions[chat_title].append({
